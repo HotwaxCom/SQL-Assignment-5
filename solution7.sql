@@ -28,7 +28,41 @@ GROUP BY ii.product_id;
 
 -- Execution Cost: 2,697,119.15
 
--- Union to get the variance and total quantity of POS orders together
+-- If written as a single query as asked in the 3rd question then,
+
+SELECT
+  p.product_id,
+  p.internal_name AS product_name,
+  COALESCE(s.total_pos_sales_qty, 0) AS total_pos_sales_quantity, -- sets value to be 0 if no value is present
+  COALESCE(v.total_pos_variance, 0) AS total_pos_variance
+FROM product p
+LEFT JOIN (
+  SELECT
+    oi.product_id,
+    SUM(oi.quantity) AS total_pos_sales_qty
+  FROM order_header oh
+  JOIN order_item oi ON oi.order_id = oh.order_id
+  WHERE
+    oh.sales_channel_enum_id = 'POS_SALES_CHANNEL'
+    AND DATE(oh.order_date) BETWEEN date('2024-10-01') AND date('2024-10-30')
+  GROUP BY oi.product_id
+) AS s ON p.product_id = s.product_id
+LEFT JOIN (
+  SELECT
+    ii.product_id,
+    SUM(iiv.quantity_on_hand_var) AS total_pos_variance
+  FROM inventory_item_variance iiv
+  JOIN inventory_item ii ON ii.inventory_item_id = iiv.inventory_item_id
+  WHERE
+    DATE(iiv.created_stamp) BETWEEN date('2024-10-01') AND date('2024-10-30')
+  GROUP BY ii.product_id
+) AS v ON p.product_id = v.product_id
+WHERE
+  s.total_pos_sales_qty IS NOT NULL
+  OR v.total_pos_variance IS NOT null;
+
+-- Execution Cost: 46,218,941.03
+
  
 
 
